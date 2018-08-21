@@ -3,13 +3,20 @@
     "description": "Wrapper/SDK for the Shopware REST API",
     "type": "library",
     "require": {
+        "php": "^7.1",
         "guzzlehttp/guzzle": "^6.3",
-        "zendframework/zend-hydrator": "^2.4"
+        "zendframework/zend-hydrator": "^2.4",
+        "zendframework/zend-router": "^3.2"
     },
     "authors": [
         {
             "name": "Pascal Krason",
             "email": "p.krason@padr.io"
         }
-    ]
+    ],
+    "autoload": {
+        "psr-4": {
+            "Padrio\\Shopware\\": "src\\"
+        }
+    }
 }
