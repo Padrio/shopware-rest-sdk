@@ -13,6 +13,6 @@ class DecodeJsonResponse extends Exception
 {
     public static function createFromJsonError(string $message, int $code)
     {
-        return new self($message, $code);
+        return new self('Failed to decode JSON Response: '. $message, $code);
     }
 }
