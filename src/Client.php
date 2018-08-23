@@ -18,7 +18,6 @@ final class Client
      */
     private $baseUrl;
 
-
     /**
      * @var ClientInterface
      */
