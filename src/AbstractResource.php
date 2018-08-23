@@ -6,11 +6,14 @@ namespace Padrio\Shopware;
 
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
+use Padrio\Shopware\Exception\DecodeJsonResponse;
+use Padrio\Shopware\Exception\UnexpectedResponse;
 use Padrio\Shopware\Http\Model\Auth;
 use Padrio\Shopware\Response\ResourceResponseInterface;
 use Zend\Hydrator\HydratorInterface;
 use Zend\Hydrator\Reflection;
 use Zend\Router\Http\RouteInterface;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * @author Pascal Krason <p.krason@padr.io>
@@ -47,6 +50,23 @@ abstract class AbstractResource
     abstract function getPath(): RouteInterface;
 
     /**
+     * Returns Response object to hydrate into
+     * @return ResourceResponseInterface
+     */
+    abstract function getResponseObject(): ResourceResponseInterface;
+
+    /**
+     * Returns a hydrator which will be used.
+     * Can be overwritten by a child.
+     *
+     * @return HydratorInterface
+     */
+    public function getHydrator(): HydratorInterface
+    {
+        return $this->hydrator;
+    }
+
+    /**
      * Find a single resource
      *
      * @param      $id
@@ -67,26 +87,74 @@ abstract class AbstractResource
      */
     abstract function findBy(array $queryParameters = []);
 
-    protected function request(array $routeParameters = [], array $queryParameters = [])
+    /**
+     * @param array $routeParameters
+     * @param array $queryParameters
+     *
+     * @return ResourceResponseInterface
+     * @throws DecodeJsonResponse
+     * @throws UnexpectedResponse
+     * @throws GuzzleException
+     */
+    protected function request(array $routeParameters = [], array $queryParameters = []): ResourceResponseInterface
     {
         $uri = $this->getPath()->assemble($routeParameters);
+
         $response = $this->client->request('GET', $uri, [
             'auth' => $this->auth->getValues(),
             'query' => $queryParameters,
         ]);
 
-        return $response;
+        $this->checkExpectedStatusCode($response);
+        $decoded = $this->decodeResponse($response);
+        return $this->hydrate($decoded);
+    }
+
+    /**
+     * @param ResponseInterface $response
+     * @param array             $statusCodes
+     *
+     * @return bool
+     * @throws UnexpectedResponse
+     */
+    private function checkExpectedStatusCode(ResponseInterface $response, $statusCodes = [200]): bool
+    {
+        if(!in_array($response->getStatusCode(), $statusCodes)) {
+            throw UnexpectedResponse::createFromStatusCode($response->getStatusCode());
+        }
+
+        return true;
+    }
+
+    /**
+     * @param ResponseInterface $response
+     *
+     * @return array
+     * @throws DecodeJsonResponse
+     */
+    private function decodeResponse(ResponseInterface $response): array
+    {
+        $content = $response->getBody()->getContents();
+        $decoded = json_decode($content, true);
+
+        if($decoded === false) {
+            throw DecodeJsonResponse::createFromJsonError(json_last_error_msg(), json_last_error());
+        }
+
+        return $decoded;
     }
 
     /**
      * @param array  $data
-     * @param object $object
      *
-     * @return object
+     * @return ResourceResponseInterface
      */
-    protected function hydrate(array $data, $object)
+    protected function hydrate(array $data): ResourceResponseInterface
     {
-        return $this->hydrator->hydrate($data, $object);
+        $object = $this->getResponseObject();
+        $object = new $object();
+
+        return $this->getHydrator()->hydrate($data, $object);
     }
 
     /**
@@ -97,11 +165,6 @@ abstract class AbstractResource
     protected function extract($object)
     {
         return $this->hydrator->extract($object);
-    }
-
-    public function getHydrator(): HydratorInterface
-    {
-        return $this->hydrator;
     }
 
     public function setHydrator(HydratorInterface $hydrator): void
