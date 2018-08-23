@@ -91,12 +91,12 @@ abstract class AbstractResource
      * @param array $routeParameters
      * @param array $queryParameters
      *
-     * @return ResourceResponseInterface
+     * @return ResourceResponseInterface[]
      * @throws DecodeJsonResponse
      * @throws UnexpectedResponse
      * @throws GuzzleException
      */
-    protected function request(array $routeParameters = [], array $queryParameters = []): ResourceResponseInterface
+    protected function request(array $routeParameters = [], array $queryParameters = [])
     {
         $uri = $this->getPath()->assemble($routeParameters);
 
@@ -106,8 +106,11 @@ abstract class AbstractResource
         ]);
 
         $this->checkExpectedStatusCode($response);
-        $decoded = $this->decodeResponse($response);
-        return $this->hydrate($decoded);
+        $resources = $this->decodeResponse($response);
+
+        return array_map(function($resource) {
+            return $this->hydrate($resource);
+        }, $resources['data'] ?? []);
     }
 
     /**
@@ -151,10 +154,7 @@ abstract class AbstractResource
      */
     protected function hydrate(array $data): ResourceResponseInterface
     {
-        $object = $this->getResponseObject();
-        $object = new $object();
-
-        return $this->getHydrator()->hydrate($data, $object);
+        return $this->getHydrator()->hydrate($data, $this->getResponseObject());
     }
 
     /**

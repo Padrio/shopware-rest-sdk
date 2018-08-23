@@ -53,6 +53,10 @@ class RecursiveHydration implements StrategyInterface
      */
     public function hydrate($value)
     {
-        return $this->hydrator->hydrate($value, $cloned);
+        if($value === null) {
+            return null;
+        }
+
+        return $this->hydrator->hydrate($value, clone $this->object);
     }
 }
