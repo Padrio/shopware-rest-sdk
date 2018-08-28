@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Padrio\Shopware;
 
+use Generator;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
 use Padrio\Shopware\Exception\DecodeJsonResponse;
+use Padrio\Shopware\Exception\MethodNotAllowed;
 use Padrio\Shopware\Exception\UnexpectedResponse;
+use Padrio\Shopware\Http\Method;
 use Padrio\Shopware\Http\Model\Auth;
 use Padrio\Shopware\Response\ResourceResponseInterface;
 use Zend\Hydrator\HydratorInterface;
@@ -47,13 +50,100 @@ abstract class AbstractResource
      *
      * @return RouteInterface
      */
-    abstract function getPath(): RouteInterface;
+    abstract public function getPath(): RouteInterface;
+
+    /**
+     * Returns an array which contains allowed HTTP-Methods which can be sent to this Path
+     *
+     * @return array
+     */
+    abstract public function getAllowedMethods(): array;
 
     /**
      * Returns Response object to hydrate into
      * @return ResourceResponseInterface
      */
-    abstract function getResponseObject(): ResourceResponseInterface;
+    abstract public function getResponseObject(): ResourceResponseInterface;
+
+    /**
+     * @param ResourceResponseInterface $object
+     *
+     * @return bool
+     * @throws DecodeJsonResponse
+     * @throws GuzzleException
+     * @throws MethodNotAllowed
+     * @throws UnexpectedResponse
+     */
+    public function update(ResourceResponseInterface $object): bool
+    {
+        $method = Method::isAllowed(Method::METHOD_DELETE, $this->getAllowedMethods());
+
+        $uri = $this->getPath()->assemble(['resourceId' => $object->getId()]);
+        $response = $this->client->request($method, $uri, [
+            'auth' => $this->auth->getValues(),
+        ]);
+
+        $this->checkExpectedStatusCode($response);
+        $response = $this->decodeResponse($response);
+
+        return (bool) $response['success'] ?? false;
+    }
+
+    /**
+     * @param ResourceResponseInterface[] $objects
+     *
+     * @return Generator
+     * @throws DecodeJsonResponse
+     * @throws GuzzleException
+     * @throws MethodNotAllowed
+     * @throws UnexpectedResponse
+     */
+    public function updateMany(array $objects): Generator
+    {
+        foreach ($objects as $object) {
+            yield $object->getId() => $this->update($object);
+        }
+    }
+
+    /**
+     * @param int $resourceId
+     *
+     * @return bool
+     * @throws DecodeJsonResponse
+     * @throws GuzzleException
+     * @throws MethodNotAllowed
+     * @throws UnexpectedResponse
+     */
+    public function delete(int $resourceId): bool
+    {
+        $method = Method::isAllowed(Method::METHOD_DELETE, $this->getAllowedMethods());
+
+        $uri = $this->getPath()->assemble(['resourceId' => $resourceId]);
+        $response = $this->client->request($method, $uri, [
+            'auth' => $this->auth->getValues(),
+        ]);
+
+        $this->checkExpectedStatusCode($response);
+        $response = $this->decodeResponse($response);
+
+        return (bool) $response['success'] ?? false;
+    }
+
+    /**
+     * @param array $resourceIds
+     *
+     * @return Generator
+     * @throws DecodeJsonResponse
+     * @throws GuzzleException
+     * @throws MethodNotAllowed
+     * @throws UnexpectedResponse
+     */
+    public function deleteMany(array $resourceIds): Generator
+    {
+        foreach($resourceIds as $resourceId) {
+            yield $resourceId => $this->delete($resourceId);
+        }
+    }
 
     /**
      * Returns a hydrator which will be used.
@@ -76,7 +166,7 @@ abstract class AbstractResource
      *
      * @return  ResourceResponseInterface
      */
-    abstract function findOne($id, $useNumAsId = false);
+    abstract public function findOne($id, $useNumAsId = false);
 
     /**
      * Fetch a resource collection which can be filtered using query parameters.
@@ -85,22 +175,25 @@ abstract class AbstractResource
      *
      * @return mixed
      */
-    abstract function findBy(array $queryParameters = []);
+    abstract public function findBy(array $queryParameters = []);
 
     /**
-     * @param array $routeParameters
-     * @param array $queryParameters
+     * @param string $method
+     * @param array  $routeParameters
+     * @param array  $queryParameters
      *
      * @return ResourceResponseInterface[]
      * @throws DecodeJsonResponse
-     * @throws UnexpectedResponse
      * @throws GuzzleException
+     * @throws UnexpectedResponse
+     * @throws MethodNotAllowed
      */
-    protected function request(array $routeParameters = [], array $queryParameters = [])
+    protected function request(string $method, array $routeParameters = [], array $queryParameters = [])
     {
-        $uri = $this->getPath()->assemble($routeParameters);
+        $method = Method::isAllowed($method, $this->getAllowedMethods());
 
-        $response = $this->client->request('GET', $uri, [
+        $uri = $this->getPath()->assemble($routeParameters);
+        $response = $this->client->request($method, $uri, [
             'auth' => $this->auth->getValues(),
             'query' => $queryParameters,
         ]);

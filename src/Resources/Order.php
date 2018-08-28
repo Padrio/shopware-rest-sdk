@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Padrio\Shopware\Resources;
 
 use Padrio\Shopware\AbstractResource;
+use Padrio\Shopware\Http\Method;
 use Padrio\Shopware\Hydrator\Order as OrderHydrator;
 use Padrio\Shopware\Response\Order as OrderResponse;
 use Padrio\Shopware\Response\ResourceResponseInterface;
@@ -17,6 +18,20 @@ use Zend\Router\Http\Segment;
  */
 class Order extends AbstractResource
 {
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getAllowedMethods(): array
+    {
+        return [
+            Method::METHOD_GET,
+            Method::METHOD_GET_COLLECTION,
+            Method::METHOD_PUT,
+            Method::METHOD_POST,
+        ];
+    }
+
     /**
      * {@inheritdoc}
      */
@@ -46,14 +61,14 @@ class Order extends AbstractResource
      */
     public function findOne($id, $useNumAsId = false)
     {
-        return $this->request(['resourceId' => $id], ['useNumAsId' => true]);
+        return $this->request(Method::METHOD_GET, ['resourceId' => $id], ['useNumAsId' => true]);
     }
 
     /**
      * {@inheritdoc}
      */
-    function findBy(array $queryParameters = [])
+    public function findBy(array $queryParameters = [])
     {
-        return $this->request([], ['useNumAsId' => true] + $queryParameters);
+        return $this->request(Method::METHOD_GET, [], ['useNumAsId' => true] + $queryParameters);
     }
 }

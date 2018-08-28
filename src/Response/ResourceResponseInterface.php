@@ -6,5 +6,5 @@ namespace Padrio\Shopware\Response;
 
 interface ResourceResponseInterface
 {
-
+    public function getId();
 }
