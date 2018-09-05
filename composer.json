@@ -4,7 +4,6 @@
     "type": "library",
     "require": {
         "php": "^7.1",
-        "ex-json": "*",
         "guzzlehttp/guzzle": "^6.3",
         "zendframework/zend-hydrator": "^2.4",
         "zendframework/zend-router": "^3.2"
